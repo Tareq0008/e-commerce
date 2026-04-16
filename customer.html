@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxury Store</title>
+    <link rel="stylesheet" href="customer.css?v=2">
+</head>
+
+<body>
+    <header class="navbar">
+        <div class="nav-left">
+            <span onclick="showCategories()">← Home</span>
+        </div>
+        <div class="nav-center">
+            <h1>G U C C I</h1>
+        </div>
+        <div class="nav-right">
+            <span onclick="toggleAuthModal('login')">Login</span>
+            <span onclick="toggleAuthModal('signup')">Sign Up</span>
+            <span>👜 Cart</span>
+        </div>
+    </header>
+
+    <main id="main-content">
+        <div id="category-view" class="grid-container">
+            <div class="category-card" onclick="loadCategory('Womens Shoulder Bags')">
+                <img src="https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=500&auto=format&fit=crop&q=60"
+                    alt="Shoulder Bags">
+                <div class="info-box">
+                    <p>Women's Shoulder Bags</p>
+                </div>
+            </div>
+            <div class="category-card" onclick="loadCategory('Womens Shoes')">
+                <img src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&auto=format&fit=crop&q=60"
+                    alt="Women's Shoes">
+                <div class="info-box">
+                    <p>Women's Shoes</p>
+                </div>
+            </div>
+            
+            <div class="category-card" onclick="loadCategory('Mens Shoes')">
+                <img src="https://images.unsplash.com/photo-1491553895911-0055eca6402d?w=500&auto=format&fit=crop&q=60"
+                    alt="Men's Shoes">
+                <div class="info-box">
+                    <p>Men's Shoes</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="product-view" class="hidden">
+            <button class="back-btn" onclick="showCategories()">← Back to Categories</button>
+            <h2 id="category-title" style="text-align: center; margin-bottom: 40px; font-weight: 400;"></h2>
+            <div id="product-grid" class="grid-container"></div>
+        </div>
+
+        <div id="detail-view" class="hidden">
+            <button class="back-btn" onclick="backToGrid()">← Back to Items</button>
+            <div class="product-detail-layout" id="detail-container">
+            </div>
+        </div>
+    </main>
+
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal" onclick="toggleAuthModal()">&times;</span>
+            <h2 id="auth-title">Login</h2>
+            <input type="email" placeholder="Email Address">
+            <input type="password" placeholder="Password">
+            <button onclick="toggleAuthModal()">Submit</button>
+        </div>
+    </div>
+
+    <div id="payment-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closePaymentModal()">&times;</span>
+            <h2>Confirm Purchase</h2>
+            <p id="payment-item-name" style="margin: 15px 0; color: #666;"></p>
+            <input type="text" id="cust-name" placeholder="Your Full Name">
+            <input type="text" placeholder="Card Number (Dummy)">
+            <button onclick="confirmPurchase()">Pay Now</button>
+        </div>
+    </div>
+
+    <script src="customer.js?v=2"></script>
+</body>
+
+</html>
