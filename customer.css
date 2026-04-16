@@ -1,44 +1,120 @@
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Helvetica Neue', Arial, sans-serif; }
-body { background-color: #f9f9f9; color: #333; min-height: 100vh; }
-
-.navbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; background: #000; color: #fff; font-size: 14px; }
-.nav-center h1 { font-size: 24px; letter-spacing: 8px; font-weight: 400; }
-.nav-right span { margin-left: 20px; cursor: pointer; }
-.nav-right span:hover { text-decoration: underline; }
-
-#main-content { padding: 60px 40px; }
-.grid-container { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 50px; }
-
-/* Simpler Grid Layout (No Shadow) */
-.category-card, .product-card {
-    background: #fff;
-    border: 1px solid #eaeaea;
-    text-align: center;
-    cursor: pointer;
-    width: 22%;
-    min-width: 250px;
-    border-radius: 8px;
-    overflow: hidden;
+/* ==========================================
+   1. Reset & Base Styles
+   ========================================== */
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+    font-family: 'Helvetica Neue', Arial, sans-serif; 
 }
 
-.category-card img, .product-card img {
-    width: 100%;
-    height: 300px;
-    object-fit: cover;
-    background: #fff;
+body { 
+    background-color: #f9f9f9; 
+    color: #333; 
+    min-height: 100vh; 
+    padding-top: 70px; /* Accounts for the fixed navbar */
 }
 
-/* Info inside grid box */
-.info-box { padding: 20px; border-top: 1px solid #eaeaea; background: #fafafa; }
-.info-box p { font-size: 16px; font-weight: 500; margin-bottom: 5px; color: #000; }
-.info-box .price { font-size: 14px; color: #666; }
+/* ==========================================
+   2. Navbar
+   ========================================== */
+.navbar { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 15px 40px; 
+    background: #000; 
+    color: #fff; 
+    font-size: 14px; 
+    z-index: 1000; 
+}
+.nav-center h1 { font-size: 24px; letter-spacing: 8px; font-weight: 400; cursor: pointer; }
+.nav-right, .nav-left { display: flex; gap: 20px; align-items: center; }
+.nav-right span, .nav-left span { cursor: pointer; transition: color 0.2s; }
+.nav-right span:hover, .nav-left span:hover { text-decoration: underline; color: #ccc; }
+.search-bar { padding: 8px; border-radius: 4px; border: none; outline: none; width: 200px; }
 
-.hidden { display: none !important; }
-.back-btn { background: #000; padding: 10px 20px; border: none; color: #fff; cursor: pointer; margin-bottom: 20px; border-radius: 4px; }
-.back-btn:hover { background: #333; }
+#main-content { padding: 40px; }
 
-/* Detail View */
-.product-detail-layout { display: flex; gap: 40px; max-width: 900px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 8px; border: 1px solid #eaeaea;}
+/* ==========================================
+   3. Circular Category Slider
+   ========================================== */
+.category-slider-container { 
+    width: 100%; 
+    overflow-x: auto; 
+    padding: 20px 0; 
+    margin-bottom: 40px; 
+    white-space: nowrap; 
+    text-align: center; 
+}
+.category-slider-container::-webkit-scrollbar { height: 8px; }
+.category-slider-container::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+.category-circle-wrapper { 
+    display: inline-block; 
+    margin: 0 20px; 
+    text-align: center; 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+}
+.category-circle-wrapper:hover { transform: scale(1.05); }
+.category-circle { 
+    width: 120px; 
+    height: 120px; 
+    border-radius: 50%; 
+    object-fit: cover; 
+    border: 2px solid #eaeaea; 
+    background: #fff; 
+}
+.category-name { margin-top: 10px; font-size: 14px; font-weight: 500; }
+
+/* ==========================================
+   4. Responsive Product Grid
+   ========================================== */
+.grid-container { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 30px; 
+    margin-top: 20px; 
+}
+
+@media (max-width: 900px) { .grid-container { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .grid-container { grid-template-columns: 1fr; } }
+
+.product-card { 
+    background: #fff; 
+    border: 1px solid #eaeaea; 
+    text-align: center; 
+    border-radius: 8px; 
+    overflow: hidden; 
+    display: flex; 
+    flex-direction: column; 
+}
+.product-card img { width: 100%; height: 250px; object-fit: cover; background: #fff; cursor: pointer; }
+
+.info-box { 
+    padding: 20px; 
+    border-top: 1px solid #eaeaea; 
+    background: #fafafa; 
+    flex-grow: 1; 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: space-between; 
+}
+.info-box h3 { font-size: 16px; font-weight: 500; margin-bottom: 10px; color: #000; }
+.info-box p.desc { font-size: 13px; color: #777; margin-bottom: 10px; height: 40px; overflow: hidden; }
+.info-box .price { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 15px; }
+
+.add-to-cart-btn { background: #000; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; width: 100%; transition: background 0.3s; }
+.add-to-cart-btn:hover { background: #333; }
+
+/* ==========================================
+   5. Detail View Layout (Preserved)
+   ========================================== */
+.product-detail-layout { display: flex; gap: 40px; max-width: 900px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 8px; border: 1px solid #eaeaea; }
 .product-detail-layout img { width: 50%; object-fit: contain; }
 .detail-info { width: 50%; display: flex; flex-direction: column; justify-content: center; }
 .detail-info h2 { font-size: 28px; margin-bottom: 10px; }
@@ -46,9 +122,42 @@ body { background-color: #f9f9f9; color: #333; min-height: 100vh; }
 .detail-info .desc { font-size: 15px; color: #666; margin-bottom: 30px; line-height: 1.6; }
 .purchase-btn { background: #000; color: #fff; padding: 15px; font-size: 16px; border: none; cursor: pointer; border-radius: 4px; }
 
-/* Modals */
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.modal-content { background: #fff; padding: 30px; width: 400px; border-radius: 8px; position: relative; text-align: center;  }
+/* ==========================================
+   6. Modals (Auth & Cart)
+   ========================================== */
+.modal { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background: rgba(0,0,0,0.6); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 2000; 
+}
+.modal-content { 
+    background: #fff; 
+    padding: 30px; 
+    width: 90%; 
+    max-width: 400px; 
+    border-radius: 8px; 
+    position: relative; 
+    text-align: center; 
+}
 .close-modal { position: absolute; right: 20px; top: 20px; cursor: pointer; font-size: 20px; }
 .modal-content input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
-.modal-content button { width: 100%; padding: 12px; background: #000; color: #fff; border: none; margin-top: 10px; cursor: pointer; border-radius: 4px; }
+.modal-content button, .submit-btn { width: 100%; padding: 12px; background: #000; color: #fff; border: none; margin-top: 10px; cursor: pointer; border-radius: 4px; }
+
+/* Cart Modal Specifics */
+.cart-items-container { max-height: 300px; overflow-y: auto; text-align: left; margin-bottom: 20px; }
+.cart-item { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 10px 0; align-items: center; }
+.cart-item button { background: red; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; width: auto; margin-top: 0; }
+
+/* ==========================================
+   7. Utility Classes
+   ========================================== */
+.hidden { display: none !important; }
+.back-btn { background: transparent; border: 1px solid #000; padding: 10px 20px; color: #000; cursor: pointer; margin-bottom: 20px; border-radius: 4px; transition: 0.3s; }
+.back-btn:hover { background: #000; color: #fff; }

@@ -1,64 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Luxury Store</title>
-    <link rel="stylesheet" href="customer.css?v=2">
+    <link rel="stylesheet" href="customer.css">
 </head>
-
 <body>
     <header class="navbar">
         <div class="nav-left">
-            <span onclick="showCategories()">← Home</span>
+            <span onclick="loadAllProducts()">Home</span>
+            <span>Contact</span>
+            <input type="text" id="search-input" class="search-bar" placeholder="Search products..." onkeyup="handleSearch(event)">
         </div>
         <div class="nav-center">
-            <h1>G U C C I</h1>
+            <h1 onclick="loadAllProducts()">G U C C I</h1>
         </div>
         <div class="nav-right">
-            <span onclick="toggleAuthModal('login')">Login</span>
-            <span onclick="toggleAuthModal('signup')">Sign Up</span>
-            <span>👜 Cart</span>
+            <span id="nav-user-greet" class="hidden">Hello, <b id="user-name-display"></b></span>
+            <span id="nav-login" onclick="toggleAuthModal('login')">Login</span>
+            <span id="nav-signup" onclick="toggleAuthModal('signup')">Sign Up</span>
+            <span id="nav-logout" class="hidden" onclick="logout()">Logout</span>
+            <span onclick="openCartModal()">👜 Cart (<b id="cart-count">0</b>)</span>
         </div>
     </header>
 
     <main id="main-content">
-        <div id="category-view" class="grid-container">
-            <div class="category-card" onclick="loadCategory('Womens Shoulder Bags')">
-                <img src="https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=500&auto=format&fit=crop&q=60"
-                    alt="Shoulder Bags">
-                <div class="info-box">
-                    <p>Women's Shoulder Bags</p>
-                </div>
+        <h2 id="explore-title" style="text-align:center; font-weight:400; margin-bottom: 20px;">Explore Categories</h2>
+        <div id="category-slider" class="category-slider-container">
             </div>
-            <div class="category-card" onclick="loadCategory('Womens Shoes')">
-                <img src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&auto=format&fit=crop&q=60"
-                    alt="Women's Shoes">
-                <div class="info-box">
-                    <p>Women's Shoes</p>
-                </div>
-            </div>
-            
-            <div class="category-card" onclick="loadCategory('Mens Shoes')">
-                <img src="https://images.unsplash.com/photo-1491553895911-0055eca6402d?w=500&auto=format&fit=crop&q=60"
-                    alt="Men's Shoes">
-                <div class="info-box">
-                    <p>Men's Shoes</p>
-                </div>
-            </div>
-        </div>
 
-        <div id="product-view" class="hidden">
-            <button class="back-btn" onclick="showCategories()">← Back to Categories</button>
-            <h2 id="category-title" style="text-align: center; margin-bottom: 40px; font-weight: 400;"></h2>
-            <div id="product-grid" class="grid-container"></div>
-        </div>
-
-        <div id="detail-view" class="hidden">
-            <button class="back-btn" onclick="backToGrid()">← Back to Items</button>
-            <div class="product-detail-layout" id="detail-container">
-            </div>
+        <div id="product-view">
+            <h2 id="view-title" style="text-align: center; margin-bottom: 40px; font-weight: 400;">All Products</h2>
+            <div id="product-grid" class="grid-container">
+                </div>
         </div>
     </main>
 
@@ -66,24 +41,24 @@
         <div class="modal-content">
             <span class="close-modal" onclick="toggleAuthModal()">&times;</span>
             <h2 id="auth-title">Login</h2>
-            <input type="email" placeholder="Email Address">
-            <input type="password" placeholder="Password">
-            <button onclick="toggleAuthModal()">Submit</button>
+            <input type="text" id="auth-name" placeholder="Full Name" class="hidden">
+            <input type="email" id="auth-email" placeholder="Email Address">
+            <input type="password" id="auth-password" placeholder="Password">
+            <button class="submit-btn" onclick="submitAuth()">Submit</button>
         </div>
     </div>
 
-    <div id="payment-modal" class="modal hidden">
+    <div id="cart-modal" class="modal hidden">
         <div class="modal-content">
-            <span class="close-modal" onclick="closePaymentModal()">&times;</span>
-            <h2>Confirm Purchase</h2>
-            <p id="payment-item-name" style="margin: 15px 0; color: #666;"></p>
-            <input type="text" id="cust-name" placeholder="Your Full Name">
-            <input type="text" placeholder="Card Number (Dummy)">
-            <button onclick="confirmPurchase()">Pay Now</button>
+            <span class="close-modal" onclick="closeCartModal()">&times;</span>
+            <h2>Your Shopping Cart</h2>
+            <div id="cart-items" class="cart-items-container">
+                </div>
+            <h3 style="text-align:right; margin-bottom: 15px;">Total: $<span id="cart-total">0.00</span></h3>
+            <button class="submit-btn" onclick="checkout()">Checkout</button>
         </div>
     </div>
 
-    <script src="customer.js?v=2"></script>
+    <script src="customer.js"></script>
 </body>
-
 </html>
