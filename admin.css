@@ -9,7 +9,7 @@ body {
     background-color: #f4f7f6;
     color: #333;
 } 
-
+ 
 .dashboard-container {
     display: flex; 
     min-height: 100vh;
