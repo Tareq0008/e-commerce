@@ -70,7 +70,8 @@ async function logout() {
     
     // Clear the password field for security/UX
     document.getElementById('password').value = '';
-    
+    document.getElementById('username').value = '';
+        
     checkAuth();
 }
 
@@ -455,7 +456,7 @@ async function executeDeleteCategory() {
     const res = await fetch('admin_api.php?action=categories', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
+        body: JSON.stringify({ id: id }) 
     });
 
     if (res.ok) {
