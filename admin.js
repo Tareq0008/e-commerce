@@ -16,13 +16,25 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function checkAuth() {
-    const res = await fetch('api.php?action=check_auth');
-    const data = await res.json();
-    if (data.authenticated) {
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('dashboard').classList.remove('hidden');
-        initializeApp();
-    } else {
+    try {
+        const res = await fetch('admin_api.php?action=check_auth');
+        
+        // This catches 404 or 500 server errors
+        if (!res.ok) throw new Error("Server error");
+
+        const data = await res.json();
+        
+        if (data.admin_authenticated) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            initializeApp();
+        } else {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+        }
+    } catch (error) {
+        console.error("API failed, defaulting to login screen:", error);
+        // This ensures the login screen ALWAYS shows if the API crashes
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('dashboard').classList.add('hidden');
     }
@@ -32,26 +44,38 @@ async function login() {
     const user = document.getElementById('username').value;
     const pass = document.getElementById('password').value;
     
-    const res = await fetch('api.php?action=login', {
+    const res = await fetch('admin_api.php?action=login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user, password: pass })
+        body: JSON.stringify({ username: user, password: pass }) // Updated payload
     });
     
-    if (res.ok) {
-        document.getElementById('login-error').style.display = 'none';
-        checkAuth();
+    const data = await res.json();
+    if (data.success) {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        initializeApp();
     } else {
         document.getElementById('login-error').style.display = 'block';
     }
 }
 
 async function logout() {
-    await fetch('api.php?action=logout');
+    // Using POST is best practice for state-changing actions like logout.
+    // 'no-store' guarantees the browser won't use a cached version.
+    await fetch('admin_api.php?action=logout', { 
+        method: 'POST',
+        cache: 'no-store' 
+    });
+    
+    // Clear the password field for security/UX
+    document.getElementById('password').value = '';
+    document.getElementById('username').value = '';
+        
     checkAuth();
 }
 
-function initializeApp() {
+function initializeApp() { 
     fetchCategories();
     fetchProducts();
     fetchOrders();
@@ -62,7 +86,7 @@ function initializeApp() {
 
 // 1. Categories
 async function fetchCategories() {
-    const res = await fetch('api.php?action=categories');
+    const res = await fetch('admin_api.php?action=categories');
     if (res.status === 401) return checkAuth();
     const categories = await res.json();
     
@@ -91,13 +115,13 @@ async function fetchProducts() {
     const categoryInput = document.getElementById('filterCategory');
     const categoryId = categoryInput ? categoryInput.value : '';
     
-    const response = await fetch(`api.php?action=products&search=${encodeURIComponent(search)}&category_id=${categoryId}`);
+    const response = await fetch(`admin_api.php?action=products&search=${encodeURIComponent(search)}&category_id=${categoryId}`);
     if (response.status === 401) return checkAuth();
     
     allProducts = await response.json();
     renderProducts();
     renderInventory();
-}
+} 
 
 function renderProducts() {
     const tbody = document.getElementById('products-tbody');
@@ -161,7 +185,7 @@ async function fetchOrders() {
     const categoryInput = document.getElementById('filterOrderCategory');
     const categoryId = categoryInput ? categoryInput.value : '';
     
-    const response = await fetch(`api.php?action=orders&search=${encodeURIComponent(search)}&category_id=${categoryId}`);
+    const response = await fetch(`admin_api.php?action=orders&search=${encodeURIComponent(search)}&category_id=${categoryId}`);
     if (response.status === 401) return checkAuth();
     
     const orders = await response.json();
@@ -189,7 +213,7 @@ async function fetchOrders() {
 }
 
 async function updateOrderStatus(id, status) {
-    await fetch('api.php?action=orders', {
+    await fetch('admin_api.php?action=orders', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status })
@@ -203,7 +227,7 @@ async function fetchUsers() {
     const roleInput = document.getElementById('filterUserRole');
     const role = roleInput ? roleInput.value : '';
     
-    const response = await fetch(`api.php?action=users&search=${encodeURIComponent(search)}&role=${encodeURIComponent(role)}`);
+    const response = await fetch(`admin_api.php?action=users&search=${encodeURIComponent(search)}&role=${encodeURIComponent(role)}`);
     if (response.status === 401) return checkAuth();
     
     const users = await response.json();
@@ -230,7 +254,7 @@ async function fetchUsers() {
 }
 
 async function updateUserRole(id, role) {
-    await fetch('api.php?action=users', {
+    await fetch('admin_api.php?action=users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, role })
@@ -297,7 +321,7 @@ async function saveProduct() {
         formData.append('image', imageFile);
     }
 
-    await fetch('api.php?action=products', {
+    await fetch('admin_api.php?action=products', {
         method: 'POST',
         body: formData
     });
@@ -320,7 +344,7 @@ function closeDeleteProductModal() {
 async function executeDeleteProduct() {
     const id = document.getElementById('deleteProductId').value;
     
-    await fetch('api.php?action=products', {
+    await fetch('admin_api.php?action=products', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: id })
@@ -342,7 +366,7 @@ function closeManageCategoriesModal() {
 }
 
 async function renderManageCategories() {
-    const res = await fetch('api.php?action=categories');
+    const res = await fetch('admin_api.php?action=categories');
     if (res.status === 401) return checkAuth();
     const categories = await res.json();
     
@@ -399,7 +423,7 @@ async function saveCategoryAction() {
     const method = id ? 'PUT' : 'POST';
     const bodyData = id ? { id: id, name: name } : { name: name };
 
-    const res = await fetch('api.php?action=categories', {
+    const res = await fetch('admin_api.php?action=categories', {
         method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyData)
@@ -429,7 +453,7 @@ function closeDeleteCategoryModal() {
 async function executeDeleteCategory() {
     const id = document.getElementById('deleteCategoryId').value;
     
-    const res = await fetch('api.php?action=categories', {
+    const res = await fetch('admin_api.php?action=categories', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: id })
