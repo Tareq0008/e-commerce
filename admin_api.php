@@ -25,7 +25,26 @@ if ($action === 'login' && $method === 'POST') {
         echo json_encode(["success" => true, "admin_authenticated" => true]);
     } else {
         echo json_encode(["success" => false, "message" => "Invalid credentials"]);
-    }
+    } 
+    exit;
+}
+
+// 1. ADMIN AUTHENTICATION
+if ($action === 'login' && $method === 'POST') {
+    // Fixed: Look for 'username' instead of 'email'
+    $username = $inputData['username'] ?? ''; 
+    $password = $inputData['password'] ?? '';
+
+    $stmt = $pdo->prepare("SELECT * FROM admin_users WHERE username = ?");
+    $stmt->execute([$username]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user && password_verify($password, $user['password_hash'])) {
+        $_SESSION['admin_id'] = $user['id'];
+        echo json_encode(["success" => true, "admin_authenticated" => true]);
+    } else {
+        echo json_encode(["success" => false, "message" => "Invalid credentials"]);
+    } 
     exit;
 }
 
@@ -33,6 +52,15 @@ if ($action === 'check_auth') {
     echo json_encode(["admin_authenticated" => isset($_SESSION['admin_id'])]);
     exit;
 }
+
+// === ADD THIS NEW LOGOUT BLOCK ===
+if ($action === 'logout' && $method === 'POST') {
+    session_unset();     // Remove all session variables
+    session_destroy();   // Destroy the session
+    echo json_encode(["success" => true, "message" => "Logged out successfully"]);
+    exit;
+}
+// =================================
 
 // 2. SECURITY GUARD (Protects all code below this line)
 if (!isset($_SESSION['admin_id'])) {
