@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Luxury Store</title>
-    <link rel="stylesheet" href="customer.css">
+    <link rel="stylesheet" href="customer.css?v=2">
 </head>
 <body>
     <header class="navbar">
@@ -14,7 +14,7 @@
             <input type="text" id="search-input" class="search-bar" placeholder="Search products..." onkeyup="handleSearch(event)">
         </div>
         <div class="nav-center">
-            <h1 onclick="loadAllProducts()">G U C C I</h1>
+            <h1 onclick="loadAllProducts()">F A Z R</h1>
         </div>
         <div class="nav-right">
             <span id="nav-user-greet" class="hidden">Hello, <b id="user-name-display"></b></span>
@@ -28,15 +28,16 @@
     <main id="main-content">
         <h2 id="explore-title" style="text-align:center; font-weight:400; margin-bottom: 20px;">Explore Categories</h2>
         <div id="category-slider" class="category-slider-container">
-            </div>
+        </div>
 
         <div id="product-view">
             <h2 id="view-title" style="text-align: center; margin-bottom: 40px; font-weight: 400;">All Products</h2>
             <div id="product-grid" class="grid-container">
-                </div>
+            </div>
         </div>
     </main>
 
+    <!-- Auth Modal -->
     <div id="auth-modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-modal" onclick="toggleAuthModal()">&times;</span>
@@ -48,17 +49,65 @@
         </div>
     </div>
 
+    <!-- Cart Modal -->
     <div id="cart-modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-modal" onclick="closeCartModal()">&times;</span>
             <h2>Your Shopping Cart</h2>
             <div id="cart-items" class="cart-items-container">
-                </div>
+            </div>
             <h3 style="text-align:right; margin-bottom: 15px;">Total: $<span id="cart-total">0.00</span></h3>
             <button class="submit-btn" onclick="checkout()">Checkout</button>
         </div>
     </div>
 
-    <script src="customer.js"></script>
+    <!-- Product Detail Modal -->
+    <div id="product-detail-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close-modal" onclick="closeProductDetailModal()">&times;</span>
+            <div id="product-detail-content"></div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal" onclick="closePaymentModal()">&times;</span>
+            <h2>Dummy Payment Gateway</h2>
+            <div id="payment-content">
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">💳</div>
+                    <h3 id="payment-product-name"></h3>
+                    <p id="payment-amount" style="font-size: 24px; color: #333; margin: 20px 0;"></p>
+                    
+                    <div style="text-align: left; margin: 20px 0;">
+                        <label>Card Number (Demo: 4242 4242 4242 4242)</label>
+                        <input type="text" id="card-number" placeholder="4242 4242 4242 4242" style="width: 100%; padding: 10px; margin: 5px 0 15px 0;">
+                        
+                        <div style="display: flex; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label>Expiry Date</label>
+                                <input type="text" id="expiry-date" placeholder="MM/YY" style="width: 100%; padding: 10px; margin: 5px 0 15px 0;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label>CVV</label>
+                                <input type="text" id="cvv" placeholder="123" style="width: 100%; padding: 10px; margin: 5px 0 15px 0;">
+                            </div>
+                        </div>
+                        
+                        <label>Cardholder Name</label>
+                        <input type="text" id="cardholder-name" placeholder="John Doe" style="width: 100%; padding: 10px; margin: 5px 0 15px 0;">
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="processPayment()" style="flex: 1; background: #000; color: #fff; padding: 12px; border: none; border-radius: 4px; cursor: pointer;">Pay Now</button>
+                        <button onclick="closePaymentModal()" style="flex: 1; background: #ccc; color: #333; padding: 12px; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="customer.js?v=2"></script>
 </body>
 </html>

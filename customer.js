@@ -1,6 +1,7 @@
 let currentProducts = [];
 let cart = [];
 let authMode = 'login'; // 'login' or 'signup'
+let currentProductForPurchase = null; // Store product for buy now
 
 // Fallback images since the database doesn't have them yet
 const categoryImages = {
@@ -71,12 +72,18 @@ async function submitAuth() {
     if (data.success) {
         toggleAuthModal();
         if (authMode === 'login') checkAuthStatus();
+        if (authMode === 'signup') {
+            // Auto login after signup
+            toggleAuthModal('login');
+        }
     }
 }
 
 async function logout() {
     await fetch('customer_api.php?action=logout');
     checkAuthStatus();
+    cart = [];
+    updateCartBadge();
     alert("Logged out successfully.");
 }
 
@@ -90,7 +97,6 @@ async function loadCategories() {
         const categories = await res.json();
         
         slider.innerHTML = categories.map(cat => {
-            // Priority: 1. DB Image 2. Hardcoded Match 3. Default Fallback Image
             const img = cat.image_url || categoryImages[cat.name] || categoryImages["default"];
             
             return `
@@ -137,16 +143,19 @@ async function fetchAndDisplayProducts(url) {
 
         grid.innerHTML = currentProducts.map(p => `
             <div class="product-card">
-                <img src="${p.image_url || 'https://via.placeholder.com/300'}" alt="${p.productName}">
+                <img src="${p.image_url || 'https://via.placeholder.com/300'}" alt="${p.productName}" onclick='showProductDetail(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
                 <div class="info-box">
                     <div>
-                        <h3>${p.productName}</h3>
+                        <h3 onclick='showProductDetail(${JSON.stringify(p).replace(/'/g, "&#39;")})' style="cursor: pointer;">${p.productName}</h3>
                         <p class="desc">${p.description ? p.description.substring(0, 60) + '...' : 'No description.'}</p>
                         <p class="price">$${p.price}</p>
                     </div>
-                    ${p.stock > 0 
-                        ? `<button class="add-to-cart-btn" onclick='addToCart(${JSON.stringify(p)})'>Add to Cart</button>`
-                        : `<button class="add-to-cart-btn" style="background:#ccc; cursor:not-allowed;" disabled>Out of Stock</button>`}
+                    <div style="display: flex; gap: 10px;">
+                        ${p.stock > 0 
+                            ? `<button class="add-to-cart-btn" onclick='addToCart(${JSON.stringify(p).replace(/'/g, "&#39;")})' style="flex: 1;">Add to Cart</button>
+                               <button class="add-to-cart-btn" onclick='buyNow(${JSON.stringify(p).replace(/'/g, "&#39;")})' style="flex: 1; background: #28a745;">Buy Now</button>`
+                            : `<button class="add-to-cart-btn" style="background:#ccc; cursor:not-allowed; width:100%;" disabled>Out of Stock</button>`}
+                    </div>
                 </div>
             </div>
         `).join('');
@@ -155,14 +164,165 @@ async function fetchAndDisplayProducts(url) {
     }
 }
 
+// --- Product Detail Modal ---
+function showProductDetail(product) {
+    const modal = document.getElementById('product-detail-modal');
+    const content = document.getElementById('product-detail-content');
+    
+    content.innerHTML = `
+        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 250px;">
+                <img src="${product.image_url || 'https://via.placeholder.com/400'}" alt="${product.productName}" style="width: 100%; border-radius: 8px;">
+            </div>
+            <div style="flex: 1;">
+                <h2 style="margin-bottom: 15px;">${product.productName}</h2>
+                <p style="color: #666; margin-bottom: 15px; line-height: 1.6;">${product.description || 'No description available.'}</p>
+                <p style="font-size: 28px; color: #333; margin-bottom: 15px;">$${product.price}</p>
+                <p style="margin-bottom: 20px;">Stock: <strong>${product.stock > 0 ? product.stock + ' units' : 'Out of Stock'}</strong></p>
+                ${product.stock > 0 
+                    ? `<div style="display: flex; gap: 15px;">
+                        <button onclick='addToCartAndCloseDetail(${JSON.stringify(product).replace(/'/g, "&#39;")})' style="flex: 1; background: #000; color: #fff; padding: 12px; border: none; border-radius: 4px; cursor: pointer;">Add to Cart</button>
+                        <button onclick='buyNowAndCloseDetail(${JSON.stringify(product).replace(/'/g, "&#39;")})' style="flex: 1; background: #28a745; color: #fff; padding: 12px; border: none; border-radius: 4px; cursor: pointer;">Buy Now</button>
+                    </div>`
+                    : `<button style="width: 100%; background: #ccc; color: #666; padding: 12px; border: none; border-radius: 4px;" disabled>Out of Stock</button>`
+                }
+            </div>
+        </div>
+    `;
+    
+    modal.classList.remove('hidden');
+}
+
+function closeProductDetailModal() {
+    document.getElementById('product-detail-modal').classList.add('hidden');
+}
+
+function addToCartAndCloseDetail(product) {
+    addToCart(product);
+    closeProductDetailModal();
+}
+
+function buyNowAndCloseDetail(product) {
+    closeProductDetailModal();
+    buyNow(product);
+}
+
+// --- Buy Now with Payment ---
+function buyNow(product) {
+    // Check if user is logged in
+    fetch('customer_api.php?action=check_auth')
+        .then(res => res.json())
+        .then(data => {
+            if (!data.customer_authenticated) {
+                alert('Please login first to complete your purchase!');
+                toggleAuthModal('login');
+                return;
+            }
+            
+            currentProductForPurchase = product;
+            showPaymentModal(product);
+        });
+}
+
+function showPaymentModal(product) {
+    const modal = document.getElementById('payment-modal');
+    document.getElementById('payment-product-name').innerText = product.productName;
+    document.getElementById('payment-amount').innerHTML = `Total Amount: $${product.price}`;
+    
+    // Clear previous input values
+    document.getElementById('card-number').value = '';
+    document.getElementById('expiry-date').value = '';
+    document.getElementById('cvv').value = '';
+    document.getElementById('cardholder-name').value = '';
+    
+    modal.classList.remove('hidden');
+}
+
+function closePaymentModal() {
+    document.getElementById('payment-modal').classList.add('hidden');
+    currentProductForPurchase = null;
+}
+
+async function processPayment() {
+    // Validate payment details
+    const cardNumber = document.getElementById('card-number').value;
+    const expiryDate = document.getElementById('expiry-date').value;
+    const cvv = document.getElementById('cvv').value;
+    const cardholderName = document.getElementById('cardholder-name').value;
+    
+    if (!cardNumber || !expiryDate || !cvv || !cardholderName) {
+        alert('Please fill in all payment details');
+        return;
+    }
+    
+    // Show processing message
+    const payButton = event.target;
+    const originalText = payButton.innerText;
+    payButton.innerText = 'Processing...';
+    payButton.disabled = true;
+    
+    // Simulate payment processing
+    setTimeout(async () => {
+        try {
+            // Process the purchase
+            const res = await fetch('customer_api.php?action=buy_now', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    product: currentProductForPurchase,
+                    payment_details: {
+                        card_last_four: cardNumber.slice(-4),
+                        cardholder_name: cardholderName
+                    }
+                })
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+                alert(`Payment Successful! 🎉\n\nOrder #${data.order_id}\nProduct: ${currentProductForPurchase.productName}\nAmount: $${currentProductForPurchase.price}\n\nThank you for your purchase!`);
+                closePaymentModal();
+                
+                // Refresh products to update stock
+                await loadAllProducts();
+                
+                // Refresh cart if needed
+                await fetchCart();
+            } else {
+                alert('Purchase failed: ' + data.message);
+            }
+        } catch (error) {
+            alert('An error occurred during purchase. Please try again.');
+        } finally {
+            payButton.innerText = originalText;
+            payButton.disabled = false;
+        }
+    }, 1500);
+}
+
 // --- Cart System ---
 async function fetchCart() {
     const res = await fetch('customer_api.php?action=cart');
-    cart = await res.json();
+    const data = await res.json();
+    if (data.success) {
+        cart = data.cart || [];
+    } else {
+        cart = [];
+    }
     updateCartBadge();
 }
 
 async function addToCart(product) {
+    // Check if user is logged in
+    const authRes = await fetch('customer_api.php?action=check_auth');
+    const authData = await authRes.json();
+    
+    if (!authData.customer_authenticated) {
+        alert('Please login first to add items to cart!');
+        toggleAuthModal('login');
+        return;
+    }
+    
     const res = await fetch('customer_api.php?action=cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -173,6 +333,8 @@ async function addToCart(product) {
         cart = data.cart;
         updateCartBadge();
         alert(`${product.productName} added to cart!`);
+    } else {
+        alert(data.message || 'Failed to add to cart');
     }
 }
 
@@ -208,27 +370,32 @@ function renderCartItems() {
     const container = document.getElementById('cart-items');
     let total = 0;
     
-    if (cart.length === 0) {
+    if (!cart || cart.length === 0) {
         container.innerHTML = '<p>Your cart is empty.</p>';
-    } else {
-        container.innerHTML = cart.map(item => {
-            total += (item.price * item.quantity);
-            return `
-                <div class="cart-item">
-                    <div>
-                        <strong>${item.productName}</strong><br>
-                        $${item.price} x ${item.quantity}
-                    </div>
-                    <button onclick="removeFromCart(${item.id})">Remove</button>
-                </div>
-            `;
-        }).join('');
+        document.getElementById('cart-total').innerText = '0.00';
+        return;
     }
+    
+    container.innerHTML = cart.map(item => {
+        total += (item.price * item.quantity);
+        return `
+            <div class="cart-item">
+                <div>
+                    <strong>${item.productName}</strong><br>
+                    $${item.price} x ${item.quantity}
+                </div>
+                <button onclick="removeFromCart(${item.id})">Remove</button>
+            </div>
+        `;
+    }).join('');
     document.getElementById('cart-total').innerText = total.toFixed(2);
 }
 
 async function checkout() {
-    if (cart.length === 0) return alert("Add items to cart first!");
+    if (!cart || cart.length === 0) {
+        alert("Add items to cart first!");
+        return;
+    }
 
     const res = await fetch('customer_api.php?action=checkout', { method: 'POST' });
     const data = await res.json();
@@ -236,9 +403,9 @@ async function checkout() {
     if (data.success) {
         alert(data.message + " ID: " + data.order_id);
         closeCartModal();
-        fetchCart(); // refresh cart
-        loadAllProducts(); // refresh stock
+        await fetchCart();
+        await loadAllProducts();
     } else {
-        alert("Checkout failed. Are you logged in?");
+        alert("Checkout failed. " + (data.message || "Please try again."));
     }
 }
