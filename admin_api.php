@@ -6,32 +6,21 @@ header("Access-Control-Allow-Headers: Content-Type");
 
 require 'db.php';
 
+// === UPLOAD DIRECTORY CONFIGURATION ===
+$uploadDir = __DIR__ . '/uploads/';
+
+// Create uploads directory if it doesn't exist
+if (!file_exists($uploadDir)) {
+    mkdir($uploadDir, 0777, true);
+}
+// =====================================
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 $inputData = json_decode(file_get_contents("php://input"), true);
 
 // 1. ADMIN AUTHENTICATION
 if ($action === 'login' && $method === 'POST') {
-    // Fixed: Look for 'username' instead of 'email'
-    $username = $inputData['username'] ?? ''; 
-    $password = $inputData['password'] ?? '';
-
-    $stmt = $pdo->prepare("SELECT * FROM admin_users WHERE username = ?");
-    $stmt->execute([$username]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($user && password_verify($password, $user['password_hash'])) {
-        $_SESSION['admin_id'] = $user['id'];
-        echo json_encode(["success" => true, "admin_authenticated" => true]);
-    } else {
-        echo json_encode(["success" => false, "message" => "Invalid credentials"]);
-    } 
-    exit;
-}
-
-// 1. ADMIN AUTHENTICATION
-if ($action === 'login' && $method === 'POST') {
-    // Fixed: Look for 'username' instead of 'email'
     $username = $inputData['username'] ?? ''; 
     $password = $inputData['password'] ?? '';
 
@@ -53,14 +42,12 @@ if ($action === 'check_auth') {
     exit;
 }
 
-// === ADD THIS NEW LOGOUT BLOCK ===
 if ($action === 'logout' && $method === 'POST') {
-    session_unset();     // Remove all session variables
-    session_destroy();   // Destroy the session
+    session_unset();
+    session_destroy();
     echo json_encode(["success" => true, "message" => "Logged out successfully"]);
     exit;
 }
-// =================================
 
 // 2. SECURITY GUARD (Protects all code below this line)
 if (!isset($_SESSION['admin_id'])) {
@@ -69,9 +56,9 @@ if (!isset($_SESSION['admin_id'])) {
     exit;
 }
 
-// 3. ADMIN ENDPOINTS (Move your existing admin logic here)
+// 3. ADMIN ENDPOINTS
 if ($action === 'products') {
-    // ... Copy your admin product logic here (GET all, POST, PUT, DELETE) ...
+    
     if ($method === 'GET') {
         $search = isset($_GET['search']) ? '%' . $_GET['search'] . '%' : '%';
         $categoryId = isset($_GET['category_id']) && $_GET['category_id'] !== '' ? $_GET['category_id'] : null;
@@ -102,14 +89,22 @@ if ($action === 'products') {
         $imageUrl = null;
 
         if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-            $fileName = time() . '_' . basename($_FILES['image']['name']);
+            // Generate unique filename to prevent overwrites
+            $fileExtension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $fileName = time() . '_' . uniqid() . '.' . $fileExtension;
             $targetFilePath = $uploadDir . $fileName;
+            
             if (move_uploaded_file($_FILES['image']['tmp_name'], $targetFilePath)) {
-                $imageUrl = $targetFilePath;
+                // Store relative path for web access
+                $imageUrl = 'uploads/' . $fileName;
+            } else {
+                echo json_encode(["message" => "Failed to upload image file."]);
+                exit;
             }
         }
 
         if ($id) {
+            // Update existing product
             if ($imageUrl) {
                 $stmt = $pdo->prepare("UPDATE products SET productName=?, price=?, stock=?, description=?, category_id=?, image_url=? WHERE id=?");
                 $success = $stmt->execute([$name, $price, $stock, $description, $categoryId, $imageUrl, $id]);
@@ -119,8 +114,9 @@ if ($action === 'products') {
             }
             echo json_encode(["message" => $success ? "Product updated!" : "Update failed."]);
         } else {
+            // Create new product - image is required for new products
             if ($name && $price && $imageUrl) {
-                $stmt = $pdo->prepare("INSERT INTO products (productName, price, stock, description, category_id, image_url) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO products (productName, price, stock, description, category_id, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
                 $success = $stmt->execute([$name, $price, $stock, $description, $categoryId, $imageUrl]);
                 echo json_encode(["message" => $success ? "Product created!" : "Creation failed."]);
             } else {
@@ -137,36 +133,7 @@ if ($action === 'products') {
     }
 }
 
-// if ($action === 'categories') {
-//    if ($method === 'POST') {
-//         $name = $inputData['name'] ?? '';
-//         $imageUrl = $inputData['image_url'] ?? '';
-//         if ($name) {
-//             $stmt = $pdo->prepare("INSERT INTO categories (name, image_url) VALUES (?, ?)");
-//             $success = $stmt->execute([$name, $imageUrl]);
-//             echo json_encode(["message" => $success ? "Category created!" : "Failed.", "id" => $pdo->lastInsertId()]);
-//         }
-//     }
-//     else if ($method === 'PUT') {
-//         $id = $inputData['id'] ?? null;
-//         $name = $inputData['name'] ?? '';
-//         if ($id && $name) {
-//             $stmt = $pdo->prepare("UPDATE categories SET name = ? WHERE id = ?");
-//             $success = $stmt->execute([$name, $id]);
-//             echo json_encode(["message" => $success ? "Category updated!" : "Failed."]);
-//         }
-//     }
-//     else if ($method === 'DELETE') {
-//         $id = $inputData['id'] ?? null;
-//         if ($id) {
-//             $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
-//             $success = $stmt->execute([$id]);
-//             echo json_encode(["message" => $success ? "Category deleted!" : "Failed."]);
-//         }
-//     }
-// }
 if ($action === 'categories') {
-   // ADD THIS GET METHOD HANDLER FIRST:
    if ($method === 'GET') {
         $stmt = $pdo->prepare("SELECT * FROM categories ORDER BY name ASC");
         $stmt->execute();
@@ -176,7 +143,6 @@ if ($action === 'categories') {
         $name = $inputData['name'] ?? '';
         $imageUrl = $inputData['image_url'] ?? '';
         if ($name) {
-            // Check if category already exists
             $checkStmt = $pdo->prepare("SELECT id FROM categories WHERE name = ?");
             $checkStmt->execute([$name]);
             if ($checkStmt->fetch()) {
@@ -194,7 +160,6 @@ if ($action === 'categories') {
         $id = $inputData['id'] ?? null;
         $name = $inputData['name'] ?? '';
         if ($id && $name) {
-            // Check if another category already has this name
             $checkStmt = $pdo->prepare("SELECT id FROM categories WHERE name = ? AND id != ?");
             $checkStmt->execute([$name, $id]);
             if ($checkStmt->fetch()) {
@@ -211,11 +176,9 @@ if ($action === 'categories') {
     else if ($method === 'DELETE') {
         $id = $inputData['id'] ?? null;
         if ($id) {
-            // First, update products with this category to NULL (uncategorized)
             $updateStmt = $pdo->prepare("UPDATE products SET category_id = NULL WHERE category_id = ?");
             $updateStmt->execute([$id]);
             
-            // Then delete the category
             $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
             $success = $stmt->execute([$id]);
             echo json_encode(["message" => $success ? "Category deleted! Products moved to Uncategorized." : "Failed."]);
@@ -224,8 +187,8 @@ if ($action === 'categories') {
         }
     }
 }
+
 if ($action === 'users') {
-    // ... Copy your admin users logic here ...
     if ($method === 'GET') {
         $search = isset($_GET['search']) ? '%' . $_GET['search'] . '%' : '%';
         $role = isset($_GET['role']) && $_GET['role'] !== '' ? $_GET['role'] : null;
@@ -253,7 +216,6 @@ if ($action === 'users') {
 }
 
 if ($action === 'orders') {
-    // ... Copy your admin orders logic here ...
     if ($method === 'GET') {
         $search = isset($_GET['search']) ? '%' . $_GET['search'] . '%' : '%';
         $categoryId = isset($_GET['category_id']) && $_GET['category_id'] !== '' ? $_GET['category_id'] : null;
@@ -279,7 +241,7 @@ if ($action === 'orders') {
         $productName = $inputData['product_name'] ?? '';
         $price = $inputData['price'] ?? 0;
         
-        $stmt = $pdo->prepare("INSERT INTO orders (customer_name, product_name, price) VALUES (?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO orders (customer_name, product_name, price, order_date) VALUES (?, ?, ?, NOW())");
         $success = $stmt->execute([$customerName, $productName, $price]);
         
         $stmtStock = $pdo->prepare("UPDATE products SET stock = stock - 1 WHERE productName = ? AND stock > 0");
