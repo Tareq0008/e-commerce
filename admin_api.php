@@ -1,27 +1,36 @@
 <?php
 session_start();
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
+header("Content-Type: application/json");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 require 'db.php';
 
-// === UPLOAD DIRECTORY CONFIGURATION ===
+// Upload directories
 $uploadDir = __DIR__ . '/uploads/';
+$categoryUploadDir = __DIR__ . '/uploads/categories/';
 
-// Create uploads directory if it doesn't exist
+// Create directories if they don't exist
 if (!file_exists($uploadDir)) {
     mkdir($uploadDir, 0777, true);
 }
-// =====================================
+if (!file_exists($categoryUploadDir)) {
+    mkdir($categoryUploadDir, 0777, true);
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 $inputData = json_decode(file_get_contents("php://input"), true);
 
-// 1. ADMIN AUTHENTICATION
+// ============ ADMIN AUTHENTICATION ============
 if ($action === 'login' && $method === 'POST') {
-    $username = $inputData['username'] ?? ''; 
+    $username = $inputData['username'] ?? '';
     $password = $inputData['password'] ?? '';
 
     $stmt = $pdo->prepare("SELECT * FROM admin_users WHERE username = ?");
@@ -33,7 +42,7 @@ if ($action === 'login' && $method === 'POST') {
         echo json_encode(["success" => true, "admin_authenticated" => true]);
     } else {
         echo json_encode(["success" => false, "message" => "Invalid credentials"]);
-    } 
+    }
     exit;
 }
 
@@ -49,16 +58,108 @@ if ($action === 'logout' && $method === 'POST') {
     exit;
 }
 
-// 2. SECURITY GUARD (Protects all code below this line)
+// Check authentication for all other endpoints
 if (!isset($_SESSION['admin_id'])) {
     http_response_code(401);
-    echo json_encode(["error" => "Unauthorized access. Please log in."]);
+    echo json_encode(["error" => "Unauthorized"]);
     exit;
 }
 
-// 3. ADMIN ENDPOINTS
-if ($action === 'products') {
+// ============ CATEGORIES ============
+if ($action === 'categories') {
+    // GET categories
+    if ($method === 'GET') {
+        try {
+            $stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
+            $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode($categories);
+        } catch (Exception $e) {
+            echo json_encode([]);
+        }
+        exit;
+    }
     
+    // POST - Create or update category
+    if ($method === 'POST') {
+        $name = $_POST['name'] ?? '';
+        $id = $_POST['id'] ?? null;
+        
+        if (empty($name)) {
+            echo json_encode(["success" => false, "message" => "Category name is required"]);
+            exit;
+        }
+        
+        // Handle image upload
+        $imageUrl = null;
+        if (isset($_FILES['category_image']) && $_FILES['category_image']['error'] === UPLOAD_ERR_OK) {
+            $fileExtension = pathinfo($_FILES['category_image']['name'], PATHINFO_EXTENSION);
+            $fileName = 'cat_' . time() . '_' . uniqid() . '.' . $fileExtension;
+            $targetPath = $categoryUploadDir . $fileName;
+            
+            if (move_uploaded_file($_FILES['category_image']['tmp_name'], $targetPath)) {
+                $imageUrl = 'uploads/categories/' . $fileName;
+            }
+        }
+        
+        if ($id) {
+            // Update existing category
+            if ($imageUrl) {
+                // Delete old image
+                $stmt = $pdo->prepare("SELECT image_url FROM categories WHERE id = ?");
+                $stmt->execute([$id]);
+                $old = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($old && $old['image_url'] && file_exists(__DIR__ . '/' . $old['image_url'])) {
+                    unlink(__DIR__ . '/' . $old['image_url']);
+                }
+                $stmt = $pdo->prepare("UPDATE categories SET name = ?, image_url = ? WHERE id = ?");
+                $success = $stmt->execute([$name, $imageUrl, $id]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE categories SET name = ? WHERE id = ?");
+                $success = $stmt->execute([$name, $id]);
+            }
+            echo json_encode(["success" => $success, "message" => $success ? "Category updated" : "Update failed"]);
+        } else {
+            // Create new category
+            if (!$imageUrl) {
+                echo json_encode(["success" => false, "message" => "Image is required for new category"]);
+                exit;
+            }
+            $stmt = $pdo->prepare("INSERT INTO categories (name, image_url) VALUES (?, ?)");
+            $success = $stmt->execute([$name, $imageUrl]);
+            echo json_encode(["success" => $success, "message" => $success ? "Category created" : "Creation failed", "id" => $pdo->lastInsertId()]);
+        }
+        exit;
+    }
+    
+    // DELETE category
+    if ($method === 'DELETE') {
+        $id = $inputData['id'] ?? null;
+        if ($id) {
+            // Get and delete image
+            $stmt = $pdo->prepare("SELECT image_url FROM categories WHERE id = ?");
+            $stmt->execute([$id]);
+            $cat = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($cat && $cat['image_url'] && file_exists(__DIR__ . '/' . $cat['image_url'])) {
+                unlink(__DIR__ . '/' . $cat['image_url']);
+            }
+            
+            // Update products
+            $stmt = $pdo->prepare("UPDATE products SET category_id = NULL WHERE category_id = ?");
+            $stmt->execute([$id]);
+            
+            // Delete category
+            $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
+            $success = $stmt->execute([$id]);
+            echo json_encode(["success" => $success, "message" => $success ? "Category deleted" : "Delete failed"]);
+        } else {
+            echo json_encode(["success" => false, "message" => "Category ID required"]);
+        }
+        exit;
+    }
+}
+
+// ============ PRODUCTS ============
+if ($action === 'products') {
     if ($method === 'GET') {
         $search = isset($_GET['search']) ? '%' . $_GET['search'] . '%' : '%';
         $categoryId = isset($_GET['category_id']) && $_GET['category_id'] !== '' ? $_GET['category_id'] : null;
@@ -78,33 +179,29 @@ if ($action === 'products') {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    } 
-    elseif ($method === 'POST') {
-        $id = isset($_POST['id']) ? $_POST['id'] : null;
-        $name = $_POST['productName'];
-        $price = $_POST['price'];
-        $stock = isset($_POST['stock']) ? (int)$_POST['stock'] : 0;
-        $description = isset($_POST['description']) ? $_POST['description'] : '';
-        $categoryId = $_POST['category_id']; 
+        exit;
+    }
+    
+    if ($method === 'POST') {
+        $id = $_POST['id'] ?? null;
+        $name = $_POST['productName'] ?? '';
+        $price = $_POST['price'] ?? 0;
+        $stock = $_POST['stock'] ?? 0;
+        $description = $_POST['description'] ?? '';
+        $categoryId = $_POST['category_id'] ?? null;
         $imageUrl = null;
 
+        // Handle image upload
         if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-            // Generate unique filename to prevent overwrites
             $fileExtension = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
-            $fileName = time() . '_' . uniqid() . '.' . $fileExtension;
-            $targetFilePath = $uploadDir . $fileName;
-            
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $targetFilePath)) {
-                // Store relative path for web access
+            $fileName = 'prod_' . time() . '_' . uniqid() . '.' . $fileExtension;
+            $targetPath = $uploadDir . $fileName;
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $targetPath)) {
                 $imageUrl = 'uploads/' . $fileName;
-            } else {
-                echo json_encode(["message" => "Failed to upload image file."]);
-                exit;
             }
         }
 
         if ($id) {
-            // Update existing product
             if ($imageUrl) {
                 $stmt = $pdo->prepare("UPDATE products SET productName=?, price=?, stock=?, description=?, category_id=?, image_url=? WHERE id=?");
                 $success = $stmt->execute([$name, $price, $stock, $description, $categoryId, $imageUrl, $id]);
@@ -112,149 +209,84 @@ if ($action === 'products') {
                 $stmt = $pdo->prepare("UPDATE products SET productName=?, price=?, stock=?, description=?, category_id=? WHERE id=?");
                 $success = $stmt->execute([$name, $price, $stock, $description, $categoryId, $id]);
             }
-            echo json_encode(["message" => $success ? "Product updated!" : "Update failed."]);
+            echo json_encode(["success" => $success, "message" => $success ? "Product updated" : "Update failed"]);
         } else {
-            // Create new product - image is required for new products
-            if ($name && $price && $imageUrl) {
-                $stmt = $pdo->prepare("INSERT INTO products (productName, price, stock, description, category_id, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-                $success = $stmt->execute([$name, $price, $stock, $description, $categoryId, $imageUrl]);
-                echo json_encode(["message" => $success ? "Product created!" : "Creation failed."]);
-            } else {
-                echo json_encode(["message" => "Please provide name, price, stock, category, and an image."]);
+            if (!$imageUrl) {
+                echo json_encode(["success" => false, "message" => "Image is required"]);
+                exit;
             }
+            $stmt = $pdo->prepare("INSERT INTO products (productName, price, stock, description, category_id, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+            $success = $stmt->execute([$name, $price, $stock, $description, $categoryId, $imageUrl]);
+            echo json_encode(["success" => $success, "message" => $success ? "Product created" : "Creation failed"]);
         }
+        exit;
     }
-    elseif ($method === 'DELETE') {
-        if (!empty($inputData['id'])) {
-            $stmt = $pdo->prepare("DELETE FROM products WHERE id=?");
-            $success = $stmt->execute([$inputData['id']]);
-            echo json_encode(["message" => $success ? "Product deleted." : "Deletion failed."]);
-        }
-    }
-}
-
-if ($action === 'categories') {
-   if ($method === 'GET') {
-        $stmt = $pdo->prepare("SELECT * FROM categories ORDER BY name ASC");
-        $stmt->execute();
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-    else if ($method === 'POST') {
-        $name = $inputData['name'] ?? '';
-        $imageUrl = $inputData['image_url'] ?? '';
-        if ($name) {
-            $checkStmt = $pdo->prepare("SELECT id FROM categories WHERE name = ?");
-            $checkStmt->execute([$name]);
-            if ($checkStmt->fetch()) {
-                echo json_encode(["message" => "Category already exists!"]);
-            } else {
-                $stmt = $pdo->prepare("INSERT INTO categories (name, image_url) VALUES (?, ?)");
-                $success = $stmt->execute([$name, $imageUrl]);
-                echo json_encode(["message" => $success ? "Category created!" : "Failed.", "id" => $pdo->lastInsertId()]);
-            }
-        } else {
-            echo json_encode(["message" => "Category name is required."]);
-        }
-    }
-    else if ($method === 'PUT') {
-        $id = $inputData['id'] ?? null;
-        $name = $inputData['name'] ?? '';
-        if ($id && $name) {
-            $checkStmt = $pdo->prepare("SELECT id FROM categories WHERE name = ? AND id != ?");
-            $checkStmt->execute([$name, $id]);
-            if ($checkStmt->fetch()) {
-                echo json_encode(["message" => "Category name already exists!"]);
-            } else {
-                $stmt = $pdo->prepare("UPDATE categories SET name = ? WHERE id = ?");
-                $success = $stmt->execute([$name, $id]);
-                echo json_encode(["message" => $success ? "Category updated!" : "Failed."]);
-            }
-        } else {
-            echo json_encode(["message" => "Category ID and name are required."]);
-        }
-    }
-    else if ($method === 'DELETE') {
+    
+    if ($method === 'DELETE') {
         $id = $inputData['id'] ?? null;
         if ($id) {
-            $updateStmt = $pdo->prepare("UPDATE products SET category_id = NULL WHERE category_id = ?");
-            $updateStmt->execute([$id]);
-            
-            $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
+            $stmt = $pdo->prepare("DELETE FROM products WHERE id=?");
             $success = $stmt->execute([$id]);
-            echo json_encode(["message" => $success ? "Category deleted! Products moved to Uncategorized." : "Failed."]);
-        } else {
-            echo json_encode(["message" => "Category ID is required."]);
+            echo json_encode(["success" => $success, "message" => $success ? "Product deleted" : "Delete failed"]);
         }
+        exit;
     }
 }
 
+// ============ ORDERS ============
+if ($action === 'orders') {
+    if ($method === 'GET') {
+        $search = isset($_GET['search']) ? '%' . $_GET['search'] . '%' : '%';
+        $stmt = $pdo->prepare("SELECT * FROM orders WHERE customer_name LIKE ? OR product_name LIKE ? ORDER BY id DESC");
+        $stmt->execute([$search, $search]);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        exit;
+    }
+    
+    if ($method === 'PUT') {
+        $id = $inputData['id'] ?? null;
+        $status = $inputData['status'] ?? '';
+        if ($id && $status) {
+            $stmt = $pdo->prepare("UPDATE orders SET status=? WHERE id=?");
+            $success = $stmt->execute([$status, $id]);
+            echo json_encode(["success" => $success, "message" => $success ? "Order updated" : "Update failed"]);
+        }
+        exit;
+    }
+}
+
+// ============ USERS ============
 if ($action === 'users') {
     if ($method === 'GET') {
         $search = isset($_GET['search']) ? '%' . $_GET['search'] . '%' : '%';
         $role = isset($_GET['role']) && $_GET['role'] !== '' ? $_GET['role'] : null;
-
+        
         $sql = "SELECT * FROM users WHERE (name LIKE ? OR email LIKE ?)";
         $params = [$search, $search];
-
+        
         if ($role) {
             $sql .= " AND role = ?";
             $params[] = $role;
         }
-
+        
         $sql .= " ORDER BY id DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        exit;
     }
-    elseif ($method === 'PUT') {
-        $id = $inputData['id'];
-        $role = $inputData['role'];
-        $stmt = $pdo->prepare("UPDATE users SET role=? WHERE id=?");
-        $success = $stmt->execute([$role, $id]);
-        echo json_encode(["message" => $success ? "User role updated." : "Failed."]);
-    }
-}
-
-if ($action === 'orders') {
-    if ($method === 'GET') {
-        $search = isset($_GET['search']) ? '%' . $_GET['search'] . '%' : '%';
-        $categoryId = isset($_GET['category_id']) && $_GET['category_id'] !== '' ? $_GET['category_id'] : null;
-
-        $sql = "SELECT o.*, p.category_id 
-                FROM orders o 
-                LEFT JOIN products p ON o.product_name = p.productName 
-                WHERE (o.customer_name LIKE ? OR o.product_name LIKE ? OR o.id LIKE ?)";
-        $params = [$search, $search, $search];
-
-        if ($categoryId) {
-            $sql .= " AND p.category_id = ?";
-            $params[] = $categoryId;
+    
+    if ($method === 'PUT') {
+        $id = $inputData['id'] ?? null;
+        $role = $inputData['role'] ?? '';
+        if ($id && $role) {
+            $stmt = $pdo->prepare("UPDATE users SET role=? WHERE id=?");
+            $success = $stmt->execute([$role, $id]);
+            echo json_encode(["success" => $success, "message" => $success ? "User role updated" : "Update failed"]);
         }
-
-        $sql .= " ORDER BY o.id DESC";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-    elseif ($method === 'POST') {
-        $customerName = $inputData['customer_name'] ?? 'Guest';
-        $productName = $inputData['product_name'] ?? '';
-        $price = $inputData['price'] ?? 0;
-        
-        $stmt = $pdo->prepare("INSERT INTO orders (customer_name, product_name, price, order_date) VALUES (?, ?, ?, NOW())");
-        $success = $stmt->execute([$customerName, $productName, $price]);
-        
-        $stmtStock = $pdo->prepare("UPDATE products SET stock = stock - 1 WHERE productName = ? AND stock > 0");
-        $stmtStock->execute([$productName]);
-
-        echo json_encode(["message" => $success ? "Order placed successfully!" : "Order failed.", "order_id" => $pdo->lastInsertId()]);
-    }
-    elseif ($method === 'PUT') {
-        $id = $inputData['id'];
-        $status = $inputData['status'];
-        $stmt = $pdo->prepare("UPDATE orders SET status=? WHERE id=?");
-        $success = $stmt->execute([$status, $id]);
-        echo json_encode(["message" => $success ? "Order updated." : "Failed."]);
+        exit;
     }
 }
+
+echo json_encode(["success" => false, "message" => "Invalid action"]);
 ?>

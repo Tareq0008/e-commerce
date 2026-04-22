@@ -85,6 +85,7 @@ if ($action === 'logout' && $method === 'GET') {
 }
 
 // 2. Browsing (Products & Categories)
+
 if ($action === 'categories' && $method === 'GET') {
     $stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));

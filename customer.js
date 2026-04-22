@@ -3,14 +3,7 @@ let cart = [];
 let authMode = 'login'; // 'login' or 'signup'
 let currentProductForPurchase = null; // Store product for buy now
 
-// Fallback images since the database doesn't have them yet
-const categoryImages = {
-    "Womens Shoulder Bags": "https://images.unsplash.com/photo-1584916201218-f4242ceb4809?w=500&auto=format&fit=crop&q=60",
-    "Womens Shoes": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&auto=format&fit=crop&q=60",
-    "Mens Shoes": "https://images.unsplash.com/photo-1491553895911-0055eca6402d?w=500&auto=format&fit=crop&q=60",
-    "cloth": "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&auto=format&fit=crop&q=60",
-    "default": "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=500&auto=format&fit=crop&q=60"
-};
+
 
 document.addEventListener("DOMContentLoaded", () => {
     checkAuthStatus();
@@ -116,9 +109,40 @@ async function loadAllProducts() {
     fetchAndDisplayProducts(`customer_api.php?action=products`);
 }
 
-async function loadCategory(categoryName) {
-    document.getElementById('view-title').innerText = categoryName;
-    fetchAndDisplayProducts(`customer_api.php?action=products&category=${encodeURIComponent(categoryName)}`);
+// Remove this entire object from customer.js:
+// const categoryImages = { ... };
+
+// Replace loadCategories with this:
+async function loadCategories() {
+    const slider = document.getElementById('category-slider');
+    slider.innerHTML = '<p>Loading categories...</p>';
+    
+    try {
+        const res = await fetch('customer_api.php?action=categories');
+        const categories = await res.json();
+        
+        if (categories.length === 0) {
+            slider.innerHTML = '<p style="text-align: center; color: #666;">No categories available.</p>';
+            return;
+        }
+        
+        slider.innerHTML = categories.map(cat => {
+            // Use database image, show placeholder if no image
+            const img = cat.image_url && cat.image_url !== '' 
+                ? cat.image_url 
+                : 'https://via.placeholder.com/100x100?text=No+Image';
+            
+            return `
+                <div class="category-circle-wrapper" onclick="loadCategory('${cat.name}')">
+                    <img src="${img}" class="category-circle" alt="${cat.name}" onerror="this.src='https://via.placeholder.com/100x100?text=Error'">
+                    <div class="category-name">${cat.name}</div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('Error loading categories:', e);
+        slider.innerHTML = '<p>Error loading categories. Please try again later.</p>';
+    }
 }
 
 async function handleSearch(event) {

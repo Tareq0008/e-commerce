@@ -171,18 +171,30 @@
         </div>
     </div>
 
-    <div id="categoryActionModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3 id="categoryActionTitle">Add/Edit Category</h3>
-            <input type="hidden" id="actionCategoryId">
-            <input type="text" id="categoryNameInput" placeholder="Enter Category Name">
-            
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="action-btn" onclick="closeCategoryActionModal()" style="background:#bdc3c7; color:#333; flex: 1;">Cancel</button>
-                <button class="action-btn create-btn" onclick="saveCategoryAction()" style="flex: 1; margin-bottom: 0;">Save</button>
+    <!-- Updated Category Action Modal with Image Upload -->
+<div id="categoryActionModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3 id="categoryActionTitle">Add/Edit Category</h3>
+        <input type="hidden" id="actionCategoryId">
+        <input type="text" id="categoryNameInput" placeholder="Enter Category Name" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px;">
+        
+        <!-- Category Image Upload -->
+        <div style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Category Image:</label>
+            <input type="file" id="categoryImageInput" accept="image/*" style="width: 100%; padding: 8px;">
+            <div id="currentCategoryImage" style="margin-top: 10px; display: none;">
+                <small>Current Image:</small>
+                <img id="categoryImagePreview" src="" style="max-width: 100px; max-height: 100px; display: block; margin-top: 5px; border-radius: 4px;">
+                <button type="button" onclick="removeCategoryImage()" style="margin-top: 5px; padding: 5px 10px; background-color: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">Remove Image</button>
             </div>
         </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button class="action-btn" onclick="closeCategoryActionModal()" style="background:#bdc3c7; color:#333; flex: 1;">Cancel</button>
+            <button class="action-btn create-btn" onclick="saveCategoryAction()" style="flex: 1; margin-bottom: 0;">Save</button>
+        </div>
     </div>
+</div>
 
     <div id="deleteCategoryModal" class="modal" style="display: none;">
         <div class="modal-content" style="text-align: center;">
@@ -210,7 +222,7 @@
         </div>
     </div>
     
-    <script src="admin.js?v=4"></script>
+    <script src="admin.js?v=5"></script>
 </body>
 
 </html>

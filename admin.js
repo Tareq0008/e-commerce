@@ -294,17 +294,6 @@ function editProduct(id) {
     document.getElementById('productModal').style.display = 'flex'; 
 }
 
-// --- Category Modal Logic ---
-function openCategoryModal() {
-    document.getElementById('categoryModal').style.display = 'flex';
-    document.getElementById('newCategoryName').value = ''; 
-}
-
-function closeCategoryModal() {
-    document.getElementById('categoryModal').style.display = 'none';
-}
-
-
 async function saveProduct() {
     const formData = new FormData();
     const id = document.getElementById('productId').value;
@@ -330,116 +319,168 @@ async function saveProduct() {
     fetchProducts();
 }
 
-// --- Delete Product Modal Flow ---
+// Global variables
+let removeCategoryImageFlag = false;
 
-function openDeleteProductModal(id) {
-    document.getElementById('deleteProductModal').style.display = 'flex';
-    document.getElementById('deleteProductId').value = id;
-}
-
-function closeDeleteProductModal() {
-    document.getElementById('deleteProductModal').style.display = 'none';
-}
-
-async function executeDeleteProduct() {
-    const id = document.getElementById('deleteProductId').value;
-    
-    await fetch('admin_api.php?action=products', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
-    });
-
-    closeDeleteProductModal(); // Hide the modal
-    fetchProducts();           // Refresh the product list
-}
-
-// --- Manage Categories Modal Logic ---
-
-async function openManageCategoriesModal() {
-    document.getElementById('manageCategoriesModal').style.display = 'flex';
-    renderManageCategories();
-}
-
-function closeManageCategoriesModal() {
-    document.getElementById('manageCategoriesModal').style.display = 'none';
-}
-
-async function renderManageCategories() {
-    const res = await fetch('admin_api.php?action=categories');
-    if (res.status === 401) return checkAuth();
-    const categories = await res.json();
-    
-    const listDiv = document.getElementById('categoriesList');
-    listDiv.innerHTML = '';
-    
-    if (categories.length === 0) {
-        listDiv.innerHTML = '<p style="padding: 15px; text-align: center; color: #777;">No categories found.</p>';
-        return;
+// Fetch categories for dropdowns
+async function fetchCategories() {
+    try {
+        const res = await fetch('admin_api.php?action=categories');
+        if (res.status === 401) return checkAuth();
+        const categories = await res.json();
+        
+        let options = '<option value="">All Categories</option>';
+        let modalOptions = '<option value="" disabled selected>Select a Category</option>';
+        
+        categories.forEach(c => {
+            options += `<option value="${c.id}">${c.name}</option>`;
+            modalOptions += `<option value="${c.id}">${c.name}</option>`;
+        });
+        
+        const filterCat = document.getElementById('filterCategory');
+        const filterOrderCat = document.getElementById('filterOrderCategory');
+        const newProdCat = document.getElementById('newProductCategory');
+        
+        if(filterCat) filterCat.innerHTML = options;
+        if(filterOrderCat) filterOrderCat.innerHTML = options;
+        if(newProdCat) newProdCat.innerHTML = modalOptions;
+        
+        return categories;
+    } catch (error) {
+        console.error('Error fetching categories:', error);
+        return [];
     }
-    
-    categories.forEach(c => {
-        listDiv.innerHTML += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
-            <span style="font-weight: bold;">${c.name}</span>
-            <div>
-                <button class="action-btn edit-btn" style="padding: 5px 10px; font-size: 12px; margin: 0 5px;" onclick="openEditCategoryModal(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Edit</button>
-                <button class="action-btn delete-btn" style="padding: 5px 10px; font-size: 12px; margin: 0;" onclick="openDeleteCategoryModal(${c.id})">Delete</button>
-            </div>
-        </div>`;
-    });
 }
 
-// --- Add & Edit Category Modal Flow ---
+// Render categories in manage modal
+async function renderManageCategories() {
+    try {
+        const res = await fetch('admin_api.php?action=categories');
+        if (res.status === 401) return checkAuth();
+        const categories = await res.json();
+        
+        const listDiv = document.getElementById('categoriesList');
+        listDiv.innerHTML = '';
+        
+        if (categories.length === 0) {
+            listDiv.innerHTML = '<p style="padding: 15px; text-align: center; color: #777;">No categories found. Click "Add New Category" to create one.</p>';
+            return;
+        }
+        
+        categories.forEach(c => {
+            const imageHtml = c.image_url && c.image_url !== '' 
+                ? `<img src="${c.image_url}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; margin-right: 10px;">` 
+                : '<div style="width: 40px; height: 40px; background: #ddd; border-radius: 4px; margin-right: 10px; display: inline-block;"></div>';
+            
+            listDiv.innerHTML += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                <div style="display: flex; align-items: center;">
+                    ${imageHtml}
+                    <span style="font-weight: bold;">${escapeHtml(c.name)}</span>
+                </div>
+                <div>
+                    <button class="action-btn edit-btn" style="padding: 5px 10px; font-size: 12px; margin: 0 5px;" onclick="openEditCategoryModal(${c.id}, '${escapeHtml(c.name).replace(/'/g, "\\'")}', '${c.image_url || ''}')">Edit</button>
+                    <button class="action-btn delete-btn" style="padding: 5px 10px; font-size: 12px; margin: 0;" onclick="openDeleteCategoryModal(${c.id})">Delete</button>
+                </div>
+            </div>`;
+        });
+    } catch (error) {
+        console.error('Error rendering categories:', error);
+        document.getElementById('categoriesList').innerHTML = '<p style="padding: 15px; text-align: center; color: red;">Error loading categories</p>';
+    }
+}
 
 function openAddCategoryModal() {
     document.getElementById('categoryActionModal').style.display = 'flex';
     document.getElementById('categoryActionTitle').innerText = 'Add New Category';
     document.getElementById('actionCategoryId').value = '';
     document.getElementById('categoryNameInput').value = '';
+    document.getElementById('categoryImageInput').value = '';
+    document.getElementById('currentCategoryImage').style.display = 'none';
+    removeCategoryImageFlag = false;
 }
 
-function openEditCategoryModal(id, currentName) {
+function openEditCategoryModal(id, currentName, currentImageUrl) {
     document.getElementById('categoryActionModal').style.display = 'flex';
     document.getElementById('categoryActionTitle').innerText = 'Edit Category';
     document.getElementById('actionCategoryId').value = id;
     document.getElementById('categoryNameInput').value = currentName;
+    document.getElementById('categoryImageInput').value = '';
+    removeCategoryImageFlag = false;
+    
+    if (currentImageUrl && currentImageUrl !== '') {
+        document.getElementById('currentCategoryImage').style.display = 'block';
+        document.getElementById('categoryImagePreview').src = currentImageUrl;
+    } else {
+        document.getElementById('currentCategoryImage').style.display = 'none';
+    }
+}
+
+function removeCategoryImage() {
+    removeCategoryImageFlag = true;
+    document.getElementById('currentCategoryImage').style.display = 'none';
+    document.getElementById('categoryImagePreview').src = '';
 }
 
 function closeCategoryActionModal() {
     document.getElementById('categoryActionModal').style.display = 'none';
+    removeCategoryImageFlag = false;
 }
 
 async function saveCategoryAction() {
     const id = document.getElementById('actionCategoryId').value;
     const name = document.getElementById('categoryNameInput').value.trim();
+    const imageFile = document.getElementById('categoryImageInput').files[0];
     
     if (!name) {
         alert("Please enter a category name.");
         return;
     }
-
-    // If we have an ID, it's an edit (PUT). If not, it's a new category (POST)
-    const method = id ? 'PUT' : 'POST';
-    const bodyData = id ? { id: id, name: name } : { name: name };
-
-    const res = await fetch('admin_api.php?action=categories', {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData)
-    });
-
-    if (res.ok) {
-        closeCategoryActionModal();
-        fetchCategories();         // Update dropdowns
-        fetchProducts();           // Update main table
-        renderManageCategories();  // Refresh modal list
-    } else {
-        alert("Failed to save category. The name might already exist.");
+    
+    // For new category, image is required
+    if (!id && !imageFile) {
+        alert("Please select an image for the category.");
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('name', name);
+    
+    if (id) {
+        formData.append('id', id);
+    }
+    
+    if (imageFile) {
+        formData.append('category_image', imageFile);
+    }
+    
+    try {
+        const response = await fetch('admin_api.php?action=categories', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // REMOVED: alert(result.message);
+            closeCategoryActionModal();
+            await fetchCategories();
+            await fetchProducts();
+            await renderManageCategories();
+            // Also refresh the manage categories modal if open
+            const manageModal = document.getElementById('manageCategoriesModal');
+            if (manageModal && manageModal.style.display === 'flex') {
+                await renderManageCategories();
+            }
+        } else {
+            alert(result.message || "Failed to save category.");
+        }
+    } catch (error) {
+        console.error('Error saving category:', error);
+        alert("An error occurred while saving the category.");
     }
 }
-
-// --- Delete Category Modal Flow ---
 
 function openDeleteCategoryModal(id) {
     document.getElementById('deleteCategoryModal').style.display = 'flex';
@@ -453,18 +494,84 @@ function closeDeleteCategoryModal() {
 async function executeDeleteCategory() {
     const id = document.getElementById('deleteCategoryId').value;
     
-    const res = await fetch('admin_api.php?action=categories', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
-    });
-
-    if (res.ok) {
-        closeDeleteCategoryModal();
-        fetchCategories();         // Update dropdowns
-        fetchProducts();           // Update main table
-        renderManageCategories();  // Refresh modal list
-    } else {
-        alert("Failed to delete category.");
+    try {
+        const res = await fetch('admin_api.php?action=categories', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: parseInt(id) })
+        });
+        
+        const result = await res.json();
+        
+        if (result.success) {
+            // REMOVED: alert(result.message);
+            closeDeleteCategoryModal();
+            await fetchCategories();
+            await fetchProducts();
+            await renderManageCategories();
+        } else {
+            alert(result.message || "Failed to delete category.");
+        }
+    } catch (error) {
+        console.error('Error deleting category:', error);
+        alert("An error occurred while deleting the category.");
     }
+}
+
+function openManageCategoriesModal() {
+    document.getElementById('manageCategoriesModal').style.display = 'flex';
+    renderManageCategories();
+}
+
+function closeManageCategoriesModal() {
+    document.getElementById('manageCategoriesModal').style.display = 'none';
+}
+
+function openCategoryModal() {
+    document.getElementById('categoryModal').style.display = 'flex';
+    document.getElementById('newCategoryName').value = '';
+}
+
+function closeCategoryModal() {
+    document.getElementById('categoryModal').style.display = 'none';
+}
+
+async function saveCategory() {
+    const name = document.getElementById('newCategoryName').value.trim();
+    
+    if (!name) {
+        alert("Please enter a category name.");
+        return;
+    }
+    
+    try {
+        const response = await fetch('admin_api.php?action=categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            closeCategoryModal();
+            await fetchCategories();
+        } else {
+            alert(result.message || "Failed to create category.");
+        }
+    } catch (error) {
+        console.error('Error creating category:', error);
+        alert("An error occurred.");
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
 }
