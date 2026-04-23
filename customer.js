@@ -3,8 +3,6 @@ let cart = [];
 let authMode = 'login'; // 'login' or 'signup'
 let currentProductForPurchase = null; // Store product for buy now
 
-
-
 document.addEventListener("DOMContentLoaded", () => {
     checkAuthStatus();
     fetchCart();
@@ -66,7 +64,6 @@ async function submitAuth() {
         toggleAuthModal();
         if (authMode === 'login') checkAuthStatus();
         if (authMode === 'signup') {
-            // Auto login after signup
             toggleAuthModal('login');
         }
     }
@@ -89,45 +86,12 @@ async function loadCategories() {
         const res = await fetch('customer_api.php?action=categories');
         const categories = await res.json();
         
-        slider.innerHTML = categories.map(cat => {
-            const img = cat.image_url || categoryImages[cat.name] || categoryImages["default"];
-            
-            return `
-                <div class="category-circle-wrapper" onclick="loadCategory('${cat.name}')">
-                    <img src="${img}" class="category-circle" alt="${cat.name}">
-                    <div class="category-name">${cat.name}</div>
-                </div>
-            `;
-        }).join('');
-    } catch (e) {
-        slider.innerHTML = '<p>Error loading categories.</p>';
-    }
-}
-
-async function loadAllProducts() {
-    document.getElementById('view-title').innerText = "All Products";
-    fetchAndDisplayProducts(`customer_api.php?action=products`);
-}
-
-// Remove this entire object from customer.js:
-// const categoryImages = { ... };
-
-// Replace loadCategories with this:
-async function loadCategories() {
-    const slider = document.getElementById('category-slider');
-    slider.innerHTML = '<p>Loading categories...</p>';
-    
-    try {
-        const res = await fetch('customer_api.php?action=categories');
-        const categories = await res.json();
-        
         if (categories.length === 0) {
             slider.innerHTML = '<p style="text-align: center; color: #666;">No categories available.</p>';
             return;
         }
         
         slider.innerHTML = categories.map(cat => {
-            // Use database image, show placeholder if no image
             const img = cat.image_url && cat.image_url !== '' 
                 ? cat.image_url 
                 : 'https://via.placeholder.com/100x100?text=No+Image';
@@ -143,6 +107,17 @@ async function loadCategories() {
         console.error('Error loading categories:', e);
         slider.innerHTML = '<p>Error loading categories. Please try again later.</p>';
     }
+}
+
+async function loadAllProducts() {
+    document.getElementById('view-title').innerText = "All Products";
+    fetchAndDisplayProducts(`customer_api.php?action=products`);
+}
+
+// FIXED: Category filter function
+async function loadCategory(categoryName) {
+    document.getElementById('view-title').innerText = `${categoryName} Products`;
+    fetchAndDisplayProducts(`customer_api.php?action=products&category=${encodeURIComponent(categoryName)}`);
 }
 
 async function handleSearch(event) {
@@ -233,7 +208,6 @@ function buyNowAndCloseDetail(product) {
 
 // --- Buy Now with Payment ---
 function buyNow(product) {
-    // Check if user is logged in
     fetch('customer_api.php?action=check_auth')
         .then(res => res.json())
         .then(data => {
@@ -253,7 +227,6 @@ function showPaymentModal(product) {
     document.getElementById('payment-product-name').innerText = product.productName;
     document.getElementById('payment-amount').innerHTML = `Total Amount: $${product.price}`;
     
-    // Clear previous input values
     document.getElementById('card-number').value = '';
     document.getElementById('expiry-date').value = '';
     document.getElementById('cvv').value = '';
@@ -268,7 +241,6 @@ function closePaymentModal() {
 }
 
 async function processPayment() {
-    // Validate payment details
     const cardNumber = document.getElementById('card-number').value;
     const expiryDate = document.getElementById('expiry-date').value;
     const cvv = document.getElementById('cvv').value;
@@ -279,16 +251,13 @@ async function processPayment() {
         return;
     }
     
-    // Show processing message
     const payButton = event.target;
     const originalText = payButton.innerText;
     payButton.innerText = 'Processing...';
     payButton.disabled = true;
     
-    // Simulate payment processing
     setTimeout(async () => {
         try {
-            // Process the purchase
             const res = await fetch('customer_api.php?action=buy_now', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -306,11 +275,7 @@ async function processPayment() {
             if (data.success) {
                 alert(`Payment Successful! 🎉\n\nOrder #${data.order_id}\nProduct: ${currentProductForPurchase.productName}\nAmount: $${currentProductForPurchase.price}\n\nThank you for your purchase!`);
                 closePaymentModal();
-                
-                // Refresh products to update stock
                 await loadAllProducts();
-                
-                // Refresh cart if needed
                 await fetchCart();
             } else {
                 alert('Purchase failed: ' + data.message);
@@ -337,7 +302,6 @@ async function fetchCart() {
 }
 
 async function addToCart(product) {
-    // Check if user is logged in
     const authRes = await fetch('customer_api.php?action=check_auth');
     const authData = await authRes.json();
     
