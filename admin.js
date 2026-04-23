@@ -293,6 +293,49 @@ function editProduct(id) {
     
     document.getElementById('productModal').style.display = 'flex'; 
 }
+// Add these functions to your admin.js file
+
+// Delete Product Modal Functions
+function openDeleteProductModal(productId) {
+    document.getElementById('deleteProductModal').style.display = 'flex';
+    document.getElementById('deleteProductId').value = productId;
+}
+
+function closeDeleteProductModal() {
+    document.getElementById('deleteProductModal').style.display = 'none';
+    document.getElementById('deleteProductId').value = '';
+}
+
+async function executeDeleteProduct() {
+    const id = document.getElementById('deleteProductId').value;
+    
+    if (!id) {
+        console.error('No product ID found');
+        return;
+    }
+    
+    try {
+        const response = await fetch('admin_api.php?action=products', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: parseInt(id) })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Close the modal
+            closeDeleteProductModal();
+            // Refresh the products list
+            await fetchProducts();
+        } else {
+            alert(result.message || "Failed to delete product.");
+        }
+    } catch (error) {
+        console.error('Error deleting product:', error);
+        alert("An error occurred while deleting the product.");
+    }
+}
 
 async function saveProduct() {
     const formData = new FormData();
@@ -318,6 +361,8 @@ async function saveProduct() {
     closeModal();
     fetchProducts();
 }
+
+
 
 // Global variables
 let removeCategoryImageFlag = false;
